@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hexagonal Vocabulary: Imposter Syndrome</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: none; /* Prevents default touch behaviors like scrolling on the workspace */
+        }
+
+        .hexagon {
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            -webkit-clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+            width: 100%; /* Take up full space of container */
+            height: 100%; /* Take up full space of container */
+        }
+
+        .hexagon-container {
+            width: 140px;
+            height: 160px;
+            perspective: 1000px; /* For 3D effect */
+            cursor: grab;
+        }
+
+        .hexagon-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+
+        .hexagon-container.is-flipped .hexagon-inner {
+            transform: rotateY(180deg);
+        }
+        
+        .hexagon-front, .hexagon-back {
+            position: absolute;
+            -webkit-backface-visibility: hidden; /* Safari */
+            backface-visibility: hidden;
+        }
+
+        .hexagon-back {
+            transform: rotateY(180deg);
+        }
+
+        .hexagon-container.dragging {
+            opacity: 0.7;
+            transform: scale(1.1);
+            z-index: 1000;
+            cursor: grabbing;
+        }
+        
+        #workspace {
+            position: relative; /* Ensures hexagons are positioned correctly within the workspace */
+        }
+
+        #workspace .hexagon-container:hover {
+            transform: translateY(-4px);
+        }
+
+        .symbol-selector {
+            position: absolute;
+            display: none;
+            flex-direction: column;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            padding: 4px;
+            z-index: 50;
+            border: 1px solid #e2e8f0;
+        }
+
+        .symbol-selector button {
+            background: none;
+            border: none;
+            padding: 8px;
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .symbol-selector button:hover {
+            background-color: #f1f5f9;
+        }
+
+        .connection-line {
+            position: absolute;
+            stroke: #475569;
+            stroke-width: 2;
+            pointer-events: none;
+        }
+
+        .connection-symbol {
+            position: absolute;
+            background-color: white;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+            transition: transform 0.2s;
+        }
+        .connection-symbol:hover {
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+            #sidebar {
+                position: static;
+                width: 100%;
+                max-height: 50vh; /* Make sidebar scrollable on small screens */
+                border-right: none;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            #workspace-container {
+                width: 100%;
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased overflow-hidden">
+    <div id="app" class="flex h-screen w-screen main-container">
+        
+        <!-- Sidebar with Instructions and Hexagon Bank -->
+        <aside id="sidebar" class="w-full md:w-80 lg:w-96 bg-white border-r border-slate-200 flex flex-col p-4 md:p-6 overflow-y-auto">
+            <header class="mb-6">
+                <h1 class="text-2xl font-bold text-slate-900">Hexagonal Vocabulary</h1>
+                <p class="text-sm text-slate-500 mt-1">Exploring Imposter Syndrome</p>
+            </header>
+
+            <div class="space-y-4">
+                <details class="group" open>
+                    <summary class="text-lg font-semibold cursor-pointer list-none flex justify-between items-center">
+                        Instructions
+                        <svg class="w-5 h-5 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <div class="mt-2 text-sm text-slate-600 space-y-2">
+                        <p>1. Drag the terms from the "Term Bank" onto the workspace.</p>
+                        <p>2. Arrange them so connected ideas touch. They will snap into place.</p>
+                        <p>3. Click the <span class="font-mono bg-slate-200 rounded px-1.5 py-0.5">+</span> icon that appears between connected tiles to choose a relationship symbol.</p>
+                    </div>
+                </details>
+                
+                 <details class="group" open>
+                    <summary class="text-lg font-semibold cursor-pointer list-none flex justify-between items-center">
+                        Connection Symbols
+                        <svg class="w-5 h-5 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                     <ul class="mt-2 text-sm text-slate-600 space-y-2 pl-2">
+                        <li><strong class="font-bold text-lg mr-2">=</strong> Same or equivalent</li>
+                        <li><strong class="font-bold text-lg mr-2">→</strong> One causes the other</li>
+                        <li><strong class="font-bold text-lg mr-2">≠</strong> Opposites</li>
+                        <li><strong class="font-bold text-lg mr-2">X</strong> Related</li>
+                    </ul>
+                </details>
+
+                <details class="group" open>
+                    <summary class="text-lg font-semibold cursor-pointer list-none flex justify-between items-center">
+                        Term Bank
+                        <svg class="w-5 h-5 transition-transform duration-200 group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </summary>
+                    <div id="term-bank" class="mt-4 grid grid-cols-2 gap-4">
+                        <!-- Hexagons will be dynamically inserted here -->
+                    </div>
+                </details>
+                 <button id="reset-btn" class="w-full mt-4 bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Reset Workspace</button>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main id="workspace-container" class="flex-1 bg-slate-100 relative overflow-hidden">
+            <div id="workspace" class="w-full h-full">
+                <!-- Draggable hexagons will appear here -->
+            </div>
+            <svg id="connection-svg" class="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
+                <!-- Connection lines will be drawn here -->
+            </svg>
+             <div id="symbol-container" class="absolute top-0 left-0 w-full h-full pointer-events-none z-10">
+                <!-- Connection symbols will be placed here -->
+            </div>
+        </main>
+    </div>
+    
+    <!-- Symbol Selector Modal -->
+    <div id="symbol-selector" class="symbol-selector">
+        <button data-symbol="=">=</button>
+        <button data-symbol="→">→</button>
+        <button data-symbol="≠">≠</button>
+        <button data-symbol="X">X</button>
+        <button data-symbol="delete" class="text-red-500">Delete</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const terms = [
+                { id: 'identity', term: 'Identity', definition: 'The key characteristics that define a person' },
+                { id: 'imposter-syndrome', term: 'Imposter Syndrome', definition: 'Persistent fear of being exposed as a fraud' },
+                { id: 'self-doubt', term: 'Self-doubt', definition: 'Doubting your ability' },
+                { id: 'self-efficacy', term: 'Self-efficacy', definition: 'Believing in your own ability' },
+                { id: 'marginalized', term: 'Marginalized', definition: 'Made to feel insignificant; decentralized' },
+                { id: 'structural-inequality', term: 'Structural Inequality', definition: 'A system giving unfair advantages' },
+                { id: 'gender', term: 'Gender', definition: 'Roles, behaviors, and norms for male/female sexes' },
+                { id: 'qualifications', term: 'Qualifications', definition: 'Skills, experience, knowledge for a job' }
+            ];
+
+            const termBank = document.getElementById('term-bank');
+            const workspace = document.getElementById('workspace');
+            const symbolSelector = document.getElementById('symbol-selector');
+            const connectionSvg = document.getElementById('connection-svg');
+            const symbolContainer = document.getElementById('symbol-container');
+            const resetButton = document.getElementById('reset-btn');
+
+            let hexData = {}; // Store positions and connections
+            let draggedElement = null;
+            let offset = { x: 0, y: 0 };
+            
+            const HEX_WIDTH = 140;
+            const HEX_HEIGHT = 160;
+            const SNAP_DISTANCE = 40;
+            let currentConnection = null;
+
+            function createHexagon(termData, inBank = true) {
+                // Main container for positioning, events, and sizing
+                const hexContainer = document.createElement('div');
+                hexContainer.id = termData.id;
+                hexContainer.className = 'hexagon-container select-none';
+                hexContainer.draggable = true;
+
+                // Inner element for the 3D rotation
+                const hexInner = document.createElement('div');
+                hexInner.className = 'hexagon-inner';
+
+                // Front face with the term
+                const hexFront = document.createElement('div');
+                hexFront.className = 'hexagon hexagon-front bg-sky-500 text-white flex items-center justify-center p-4 text-center font-semibold text-sm';
+                hexFront.textContent = termData.term;
+
+                // Back face with the definition
+                const hexBack = document.createElement('div');
+                hexBack.className = 'hexagon hexagon-back bg-sky-600 text-white flex flex-col items-center justify-center p-4 text-center text-xs';
+                hexBack.innerHTML = `<strong class="font-bold text-sm mb-1 block">${termData.term}</strong><span>${termData.definition}</span>`;
+                
+                hexInner.appendChild(hexFront);
+                hexInner.appendChild(hexBack);
+                hexContainer.appendChild(hexInner);
+                
+                if (inBank) {
+                    hexContainer.dataset.inBank = true;
+                    termBank.appendChild(hexContainer);
+                } else {
+                    // Only add flip listener to hexagons on the workspace
+                    hexContainer.addEventListener('dblclick', () => {
+                        hexContainer.classList.toggle('is-flipped');
+                    });
+                }
+
+                // Attach drag events to the main container
+                hexContainer.addEventListener('dragstart', (e) => handleDragStart(e, termData, inBank));
+                hexContainer.addEventListener('dragend', handleDragEnd);
+                return hexContainer;
+            }
+
+            function initialize() {
+                // Clear existing elements
+                termBank.innerHTML = '';
+                workspace.innerHTML = '';
+                connectionSvg.innerHTML = '';
+                symbolContainer.innerHTML = '';
+                hexData = {};
+
+                terms.forEach(term => {
+                    createHexagon(term, true);
+                });
+            }
+
+            function handleDragEnd(e) {
+                if (!draggedElement) return;
+
+                // If a drag from the bank ends without a valid drop (e.g., outside the workspace),
+                // this ensures the original item becomes fully visible again.
+                if (draggedElement.dataset.inBank) {
+                    draggedElement.style.opacity = '1';
+                }
+
+                draggedElement.classList.remove('dragging');
+                draggedElement = null;
+            }
+
+            function handleDragStart(e, termData, inBank) {
+                draggedElement = e.target;
+                draggedElement.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', termData.id); // For Firefox compatibility
+                
+                // Calculate offset from cursor to top-left corner
+                const rect = draggedElement.getBoundingClientRect();
+                offset = { 
+                    x: e.clientX - rect.left, 
+                    y: e.clientY - rect.top 
+                };
+
+                // If dragging from the bank, we are creating a new element on the workspace
+                if (inBank) {
+                    // Temporarily hide the bank version
+                    draggedElement.style.opacity = '0.5';
+                }
+            }
+
+            workspace.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            workspace.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData('text/plain');
+                const originalElement = document.getElementById(id);
+                
+                if (!originalElement) return;
+
+                const workspaceRect = workspace.getBoundingClientRect();
+                let x = e.clientX - workspaceRect.left - offset.x;
+                let y = e.clientY - workspaceRect.top - offset.y;
+
+                // Check if this is the first hexagon on the board.
+                // It can be placed anywhere. All others must snap.
+                const isFirstHex = Object.keys(hexData).filter(key => key !== id).length === 0;
+
+                if (!isFirstHex) {
+                    const { snapX, snapY } = getSnapPosition(x, y, id);
+
+                    // If it's not the first hex and there's no valid, empty snap point, cancel the drop.
+                    if (snapX === null || snapY === null) {
+                        // For a piece from the bank, it just won't appear.
+                        // For a piece on the board, it won't move.
+                        handleDragEnd(e); // Clean up dragging state
+                        return;
+                    }
+                    // If a valid snap point is found, use its coordinates.
+                    x = snapX;
+                    y = snapY;
+                }
+
+                if (originalElement.dataset.inBank) {
+                    // Create a new hexagon in the workspace
+                    const newHex = createHexagon(terms.find(t => t.id === id), false);
+                    newHex.style.position = 'absolute';
+                    newHex.style.left = `${x}px`;
+                    newHex.style.top = `${y}px`;
+                    workspace.appendChild(newHex);
+                    
+                    hexData[id] = { x, y, connections: {} };
+                    
+                    // Remove bank element since it's now on the workspace
+                    originalElement.remove();
+
+                } else {
+                    // Move existing hexagon
+                    originalElement.style.left = `${x}px`;
+                    originalElement.style.top = `${y}px`;
+                    hexData[id].x = x;
+                    hexData[id].y = y;
+                }
+                
+                updateConnections();
+            });
+
+            function isOccupied(targetX, targetY, ignoreId) {
+                for (const id in hexData) {
+                    if (id === ignoreId) continue;
+                    const hex = hexData[id];
+                    const hexCenter = {
+                        x: hex.x + HEX_WIDTH / 2,
+                        y: hex.y + HEX_HEIGHT / 2
+                    };
+
+                    const dx = hexCenter.x - targetX;
+                    const dy = hexCenter.y - targetY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // If another hexagon's center is very close to the target point, it's occupied.
+                    if (distance < 10) { // A small tolerance for floating point inaccuracies
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            function getSnapPosition(currentX, currentY, ignoreId) {
+                let bestSnap = { snapX: null, snapY: null, distance: Infinity };
+                
+                const hexCenter = {
+                    x: currentX + HEX_WIDTH / 2,
+                    y: currentY + HEX_HEIGHT / 2
+                };
+
+                for (const id in hexData) {
+                    if (id === ignoreId) continue;
+                    
+                    const staticHex = hexData[id];
+                    const staticHexCenter = {
+                        x: staticHex.x + HEX_WIDTH / 2,
+                        y: staticHex.y + HEX_HEIGHT / 2
+                    };
+
+                    const snapPoints = getNeighborPositions(staticHexCenter.x, staticHexCenter.y);
+                    
+                    for (let i = 0; i < snapPoints.length; i++) {
+                        const point = snapPoints[i];
+                        const dist = Math.sqrt(Math.pow(hexCenter.x - point.x, 2) + Math.pow(hexCenter.y - point.y, 2));
+
+                        if (dist < SNAP_DISTANCE && dist < bestSnap.distance) {
+                             // Check if the potential snap point is already occupied by another hexagon.
+                            if (!isOccupied(point.x, point.y, ignoreId)) {
+                                bestSnap.distance = dist;
+                                bestSnap.snapX = point.x - HEX_WIDTH / 2;
+                                bestSnap.snapY = point.y - HEX_HEIGHT / 2;
+                            }
+                        }
+                    }
+                }
+                return { snapX: bestSnap.snapX, snapY: bestSnap.snapY };
+            }
+
+            function getNeighborPositions(cx, cy) {
+                const h = HEX_HEIGHT * 0.75; // vertical distance between centers
+                const w = HEX_WIDTH; // horizontal distance between centers
+                const halfW = HEX_WIDTH / 2;
+                
+                return [
+                    { x: cx + w, y: cy }, // Right
+                    { x: cx - w, y: cy }, // Left
+                    { x: cx + halfW, y: cy - h }, // Top-Right
+                    { x: cx - halfW, y: cy - h }, // Top-Left
+                    { x: cx + halfW, y: cy + h }, // Bottom-Right
+                    { x: cx - halfW, y: cy + h }, // Bottom-Left
+                ];
+            }
+            
+            function updateConnections() {
+                connectionSvg.innerHTML = '';
+                symbolContainer.innerHTML = '';
+                const drawnConnections = new Set();
+                
+                for (const id1 in hexData) {
+                    for (const id2 in hexData) {
+                        if (id1 === id2) continue;
+
+                        const hex1 = hexData[id1];
+                        const hex2 = hexData[id2];
+                        
+                        const center1 = { x: hex1.x + HEX_WIDTH / 2, y: hex1.y + HEX_HEIGHT / 2 };
+                        const center2 = { x: hex2.x + HEX_WIDTH / 2, y: hex2.y + HEX_HEIGHT / 2 };
+                        
+                        const dx = center1.x - center2.x;
+                        const dy = center1.y - center2.y;
+                        const distance = Math.sqrt(dx * dx + dy * dy);
+
+                        const isConnected = distance < HEX_WIDTH * 1.1; // A bit of tolerance
+
+                        const connectionId = [id1, id2].sort().join('-');
+
+                        if (isConnected && !drawnConnections.has(connectionId)) {
+                             drawnConnections.add(connectionId);
+                             const midX = (center1.x + center2.x) / 2;
+                             const midY = (center1.y + center2.y) / 2;
+
+                             // Check for existing connection symbol
+                             const connectionInfo1 = hexData[id1].connections[id2];
+                             const connectionInfo2 = hexData[id2].connections[id1];
+                             
+                             if (connectionInfo1) {
+                                // Draw symbol
+                                createSymbolElement(midX, midY, connectionInfo1, id1, id2);
+                             } else {
+                                // Draw plus button
+                                createPlusButton(midX, midY, id1, id2);
+                             }
+                        } else if (!isConnected) {
+                            // If they were connected, remove connection
+                            if (hexData[id1].connections[id2]) delete hexData[id1].connections[id2];
+                            if (hexData[id2].connections[id1]) delete hexData[id2].connections[id1];
+                        }
+                    }
+                }
+            }
+
+            function createPlusButton(x, y, id1, id2) {
+                const plusBtn = document.createElement('button');
+                plusBtn.className = 'connection-symbol pointer-events-auto bg-white hover:bg-slate-200';
+                plusBtn.textContent = '+';
+                plusBtn.style.left = `${x}px`;
+                plusBtn.style.top = `${y}px`;
+                plusBtn.onclick = () => showSymbolSelector(x, y, id1, id2);
+                symbolContainer.appendChild(plusBtn);
+            }
+
+            function createSymbolElement(x, y, symbol, id1, id2) {
+                const symbolEl = document.createElement('div');
+                symbolEl.className = 'connection-symbol pointer-events-auto bg-amber-300';
+                symbolEl.textContent = symbol;
+                symbolEl.style.left = `${x}px`;
+                symbolEl.style.top = `${y}px`;
+                symbolEl.onclick = () => showSymbolSelector(x, y, id1, id2);
+                symbolContainer.appendChild(symbolEl);
+            }
+
+            function showSymbolSelector(x, y, id1, id2) {
+                currentConnection = {id1, id2};
+                symbolSelector.style.display = 'flex';
+                const selectorRect = symbolSelector.getBoundingClientRect();
+                const workspaceRect = workspace.getBoundingClientRect();
+
+                let left = x + workspaceRect.left - selectorRect.width / 2;
+                let top = y + workspaceRect.top - selectorRect.height / 2;
+                
+                // Keep selector within viewport
+                left = Math.max(0, Math.min(left, window.innerWidth - selectorRect.width));
+                top = Math.max(0, Math.min(top, window.innerHeight - selectorRect.height));
+
+                symbolSelector.style.left = `${left}px`;
+                symbolSelector.style.top = `${top}px`;
+            }
+
+            symbolSelector.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON' && currentConnection) {
+                    const symbol = e.target.dataset.symbol;
+                    if (symbol === 'delete') {
+                        delete hexData[currentConnection.id1].connections[currentConnection.id2];
+                        delete hexData[currentConnection.id2].connections[currentConnection.id1];
+                    } else {
+                        hexData[currentConnection.id1].connections[currentConnection.id2] = symbol;
+                        hexData[currentConnection.id2].connections[currentConnection.id1] = symbol;
+                    }
+                    updateConnections();
+                    hideSymbolSelector();
+                }
+            });
+
+            function hideSymbolSelector() {
+                symbolSelector.style.display = 'none';
+                currentConnection = null;
+            }
+
+            // Hide selector when clicking outside
+            document.addEventListener('click', (e) => {
+                if (symbolSelector.style.display === 'flex' && !symbolSelector.contains(e.target) && !e.target.classList.contains('connection-symbol')) {
+                    hideSymbolSelector();
+                }
+            });
+
+            resetButton.addEventListener('click', () => {
+                // The confirm() dialog is often blocked in iframes, so it's removed.
+                // The workspace will now reset immediately upon clicking the button.
+                initialize();
+            });
+
+            initialize();
+        });
+    </script>
+</body>
+</html>
+
+
+
+
